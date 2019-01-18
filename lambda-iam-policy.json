@@ -14,7 +14,13 @@
         {
             "Sid": "AllowESPut",
             "Effect": "Allow",
-            "Action": "es:ESHttpPut",
+            "Action": [
+                "es:ESHttpHead",
+                "es:ESHttpPost",
+                "es:ESHttpGet",
+                "es:ESHttpDelete",
+                "es:ESHttpPut"
+            ],
             "Resource": "arn:aws:es:*:*:domain/MYESDOMAIN"
         },
         {
