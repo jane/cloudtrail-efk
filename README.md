@@ -5,7 +5,7 @@ This will pull objects from S3 as they are delivered and will post them into you
 Once you've got CloudTrail reliably inserted into your ElasticSearch cluster, start looking at stuff like [Traildash2](https://github.com/adcreare/traildash2) or AWS [cloudwatch logs subscription consumer](https://github.com/amazon-archives/cloudwatch-logs-subscription-consumer/tree/master/configuration/kibana). Both are very old, but they contain some useful widgets for visualisations.
 
 
-![CloudTrail Sample Dashboard](https://assets.grumpy.world/uploads/cloudtrail-kibana.png)]
+![CloudTrail Sample Dashboard](https://raw.githubusercontent.com/pacohope/cloudtrail-logs-to-AWS-Elasticsearch-Service/master/cloudtrail-kibana.png)
 
 # Prerequisites
 
@@ -82,9 +82,11 @@ It will take time. CloudTrail logs are delivered every few minutes. The S3 event
 1. Save the index
 1. Click on the **Discover** link at the top left. You should see some CloudTrail records.
 
-### Lambda logs
+### CloudWatch Logs
 
-On lambda web console, in the monitoring tab, theres a link for its logs on cloudwatch, you can see what the lambda function is doing.
+If you look at your function in the Lambda console, you'll see a tab labeled **Monitoring**. There's a link for its logs on cloudwatch, you can see what the lambda function is doing.
+
+You will want to click on the log group and set its retention time to something. By default, CloudWatch Logs are set to **Never Expire** and that will store every log entry forever. I set mine to 3 days. That's probably generous. I really don't need these logs at all.
 
 # My changes
 
