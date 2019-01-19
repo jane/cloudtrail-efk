@@ -90,6 +90,12 @@ def lambda_handler(event, context):
         if ( i["eventName"] == "describeInstanceHealth" ):
             continue
         
+        # I find the apiVersion causes problems with the index mapping.
+        # The -right- solution would be to solve it with a proper mapping.
+        # Frankly, I never use apiVersion in any of my searches. I really
+        # don't care. So I'm just deleting it.
+        i.pop( 'apiVersion', None )
+
         # adds @timestamp field = time of the event
         i["@timestamp"] = i["eventTime"]
 
