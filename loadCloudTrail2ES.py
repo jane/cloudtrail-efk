@@ -19,7 +19,7 @@ import tempfile
 
 method        = 'POST'
 service       = 'es'
-content_type  = 'application/json'
+content_type  = 'application/x-ndjson'
 region        = None
 host          = None
 indexname     = None
@@ -137,6 +137,7 @@ def lambda_handler(event, context):
         # print( "Not CloudTrail. Skipping." )
         return
 
+    data       = ""
     eventcount = 1
     # loops over the events in the json
     for i in response["Records"]:
@@ -156,82 +157,93 @@ def lambda_handler(event, context):
 
         # removes .aws.amazon.com from eventsources
         i["eventSource"] = i["eventSource"].split(".")[0]
-        data = json.dumps(i).encode('utf-8')
-#        print( "data:\n---\n{}\n---\n".format( data ))
+        # Need to remove all newlines for application/x-ndjson format
+        # replace them with spaces
+        record = re.sub( pattern='\n+', repl=' ', string=json.dumps(i) )
+        # print( "data:\n---\n{}\n---\n".format( record ))
 
         # defines correct index name based on eventTime, so we have an index for each day on ES
         event_date = i["eventTime"].split("T")[0]
+        # application/x-ndjson is a line with a command ("index") followed by a line
+        # with the data.
+        data = data + "{ \"index\" : { \"_index\" : \"" + indexname + \
+            '-' + event_date + "\", \"_type\" : \"_doc\" } }\n"
+        data = data + record + '\n'
+        eventcount += 1
 
-        canonical_uri = '/' + indexname + '-' + event_date + '/_doc'
-        # url endpoint for our ES cluster
-        url = 'https://' + host + canonical_uri
+    # Now that we have the big data structure, make the bulk upload request
+    canonical_uri = '/_bulk'
+    # url endpoint for our ES cluster
+    url = 'https://' + host + canonical_uri
 #        print( "Event {} url : {}\n".format(eventcount, url))
 
-        # aws signed url stuff - for comments on this check their example page linked on top comment
-        t = datetime.datetime.utcnow()
-        amz_date = t.strftime('%Y%m%dT%H%M%SZ')
-        date_stamp = t.strftime('%Y%m%d')
-        canonical_querystring = ''
-        canonical_headers = 'content-type:' + content_type + '\n' + \
-                            'host:' + host + '\n' + \
-                            'x-amz-date:' + amz_date + '\n'
-        signed_headers = 'content-type;host;x-amz-date'
-        payload_hash = hashlib.sha256(data).hexdigest()
-        canonical_request = method + '\n' + \
-                            canonical_uri + '\n' + \
-                            canonical_querystring + '\n' + \
-                            canonical_headers + '\n' + \
-                            signed_headers + '\n' + \
-                            payload_hash
-        algorithm = 'AWS4-HMAC-SHA256'
-        credential_scope = date_stamp + '/' + region + '/' + service + '/' + 'aws4_request'
-        string_to_sign = algorithm + '\n' + \
-                         amz_date + '\n' + \
-                         credential_scope + '\n' + \
-                         hashlib.sha256(canonical_request.encode('utf-8')).hexdigest()
-        signing_key = get_signature_key(secret_key, date_stamp, region, service)
-        signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
-        authorization_header = algorithm + ' ' + \
-                               'Credential=' + access_key + '/' + credential_scope + ', ' + \
-                               'SignedHeaders=' + signed_headers + ', ' + \
-                               'Signature=' + signature
-        headers = {'Content-Type':content_type,
-                   'X-Amz-Date':amz_date,
-                   'Authorization':authorization_header, 'X-Amz-Security-Token': session_token}
+    # aws signed url stuff - for comments on this check their example page linked on top comment
+    t = datetime.datetime.utcnow()
+    amz_date = t.strftime('%Y%m%dT%H%M%SZ')
+    date_stamp = t.strftime('%Y%m%d')
+    canonical_querystring = ''
+    canonical_headers = 'content-type:' + content_type + '\n' + \
+                        'host:' + host + '\n' + \
+                        'x-amz-date:' + amz_date + '\n'
+    signed_headers = 'content-type;host;x-amz-date'
+    payload_hash = hashlib.sha256(data.encode( 'utf-8' )).hexdigest()
+    canonical_request = method + '\n' + \
+                        canonical_uri + '\n' + \
+                        canonical_querystring + '\n' + \
+                        canonical_headers + '\n' + \
+                        signed_headers + '\n' + \
+                        payload_hash
+    algorithm = 'AWS4-HMAC-SHA256'
+    credential_scope = date_stamp + '/' + region + '/' + service + '/' + 'aws4_request'
+    string_to_sign = algorithm + '\n' + \
+                        amz_date + '\n' + \
+                        credential_scope + '\n' + \
+                        hashlib.sha256(canonical_request.encode('utf-8')).hexdigest()
+    signing_key = get_signature_key(secret_key, date_stamp, region, service)
+    signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+    authorization_header = algorithm + ' ' + \
+                            'Credential=' + access_key + '/' + credential_scope + ', ' + \
+                            'SignedHeaders=' + signed_headers + ', ' + \
+                            'Signature=' + signature
+    headers = {'Content-Type':content_type,
+                'X-Amz-Date':amz_date,
+                'Authorization':authorization_header, 'X-Amz-Security-Token': session_token}
 
-        eventcount += 1
-        if( dryrun == True ):
-            # don't do anything more
-            continue
+    if( dryrun == True ):
+        # don't do anything more
+        s3obj.close()
+        os.unlink(s3obj.name)
+        print( "Dry Run: {} events in {}".format(eventcount, key) )
+        return
 
-        # sends the json to elasticsearch
-        req = requests.post(url, data=data, headers=headers)
-#        print( "Attempt 0 status code: {}".format(req.status_code))
-#        print( "response:\n---\n{}\n---\n".format( req.text ))
+    # sends the json to elasticsearch
+    req = requests.post(url, data=data, headers=headers)
+    # print( "Attempt 0 status code: {}".format(req.status_code))
+    # print( "response:\n---\n{}\n---\n".format( req.text ))
 
-        retry_counter = 1
+    retry_counter = 1
 
-        """
-        if we fail for some reason we will retry 3 times
-        you will most likely have errors if you're copying a huge ammount of logs from an old bucket
-        to your new one.
+    """
+    if we fail for some reason we will retry 3 times
+    you will most likely have errors if you're copying a huge ammount of logs from an old bucket
+    to your new one.
 
-        For normal usage you shouldnt have to worry about this.
-        I got it in production with 90 aws accounts pointing to the same bucket,
-        and a pair of m3.mediums on the ES cluster, with 0 errors.
+    For normal usage you shouldnt have to worry about this.
+    I got it in production with 90 aws accounts pointing to the same bucket,
+    and a pair of m3.mediums on the ES cluster, with 0 errors.
 
-        I dont raise an exception on errors to not miss all the other entries in the file, or risk repeating any
-        inserts done before the error.
-        """
-        # if our status code is not successfull, and our retry counter is less than 4
-        while (req.status_code != 201) and (retry_counter < 4):
+    I dont raise an exception on errors to not miss all the other entries in the file, or risk repeating any
+    inserts done before the error.
+    """
+    # if our status code is not successfull, and our retry counter is less than 4
+    while (req.status_code != 201) and (retry_counter < 4):
 #            print( "Got code {}. Retrying {} of 3".format( req.status_code, retry_counter) )
 
-            # send the data to ES again
-            req = requests.post(url, data=data, headers=headers)
+        # send the data to ES again
+        req = requests.post(url, data=data, headers=headers)
 
 #            print( "status code: {}".format(req.status_code))
-            retry_counter += 1
+        retry_counter += 1
 
     s3obj.close()
     os.unlink(s3obj.name)
@@ -242,6 +254,7 @@ if __name__ == "__main__":
     import botocore
     import argparse
     import sys
+    import re
 
     # Parse command line args
     args          = initArgs().get_args()
@@ -284,8 +297,8 @@ if __name__ == "__main__":
         # though 'limit' is set to 1. (if your cloudtrail bucket
         # is as dumb as mine...)
         done_items += 1
-        if args.limit > 0 and done_items == args.limit:
-            print( "Completed {} objects. Done.".format(args.limit))
+        if args.limit != None and args.limit > 0 and done_items == args.limit:
+            print( "Completed {} objects. Stopping.".format(args.limit))
             break
 
 else:
