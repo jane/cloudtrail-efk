@@ -43,7 +43,7 @@ Create an AWS IAM role.
 
 ### Create the Lambda Function
 
-These are instructions for doing it by hand in the console. There's also a (cloudtrail2ES.yaml) file that contains some CloudFormation.
+These are instructions for doing it by hand in the console. There's also a[(cloudtrail2ES.yaml](cloudtrail2ES.yaml) file that contains some CloudFormation.
 
 1. Create a new Lambda Function
 2. Choose **Python 3.6** as a runtime.
@@ -88,9 +88,37 @@ If you look at your function in the Lambda console, you'll see a tab labeled **M
 
 You will want to click on the log group and set its retention time to something. By default, CloudWatch Logs are set to **Never Expire** and that will store every log entry forever. I set mine to 3 days. That's probably generous. I really don't need these logs at all.
 
+# Preloading Events
+
+If, like me, you turned on CloudTrail a long time ago, and now you're just starting to analyse it with ElasticSearch, you might want to import a lot of S3 objects from your CloudTrail bucket. There's a script `loadCloudTrail2ES.py` that will do that. You invoke it something like this:
+
+```
+python3 loadCloudTrail2ES.py \
+    --bucket MYCLOUDTRAILBUCKET \
+    --endpoint MYELASTICSEARCHDOMAIN \
+    --region eu-west-1 \
+    --prefix AWSLogs/111111111111/CloudTrail/
+```
+
+## Other Options
+Note that it takes a few other optional arguments that you can use to test before you turn it loose:
+* `--limit X` will stop after processing _X_ S3 objects.
+* `--dryrun` will cause it to fetch and parse the S3 objects, but it will not `POST` them to ElasticSearch.
+* `--index` will name the index something different. By default it names the index `cloudtrail-YYYY-MM-DD`. If you give it `--index foo` on the command line, it will use `foo-YYYY-MM-DD` as the index instead.
+* `--profile` will use the `STS::AssumeRole` feature to assume the role for invoking AWS API calls. See [the named profiles documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html) for more information on how that works.
+* `--prefix` is optional. If you leave it out, it defaults to `AWSLogs/` with the assumption that you probably want to limit yourself to CloudTrail logs, and that's the prefix where they're written by default. If you want no prefix at all, so that the script parses every single object in the bucket, you need to specify `--prefix=/`.
+
+## Notes
+
+The `loadCloudTrail2ES.py` script uses the [bulk upload](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html) API of ElasticSearch. It does not stop to think about whether that would be a good idea. It batches up all the CloudTrail events in the S3 object and sends them to ElasticSearch in a single request. My S3 objects rarely have more than 100 CloudTrail events in them and this always succeeds for me. But if you have a really active account and you have hundreds or thousnds of events in a single S3 object, this might fail.
+
+If you screw up, remember that `curl -X DELETE https://endpoint/cloudtrail-*` is your friend. You can delete ElasticSearch indexes fairly easily.
+
 # My changes
 
 I updated it to run on Python 3.6 and to draw its configuration from the environment. It should not need to be modified code-wise. I also added a quick check in case the object isn't a CloudTrail record. I enable CloudTrail Digests on my logs, and those end up in somewhat similar paths.
+
+I also ran into trouble with the `apiVersion` attribute of many CloudTrail records. ElasticSearch wants to treat it as a date, because it often looks like one. (e.g., `2012-10-17`). I find it causes problems and there are blog posts about it. Frankly, I never search on `apiVersion` and I don't care. So my Lambda function is removing it. It doesn't store `apiVersion` in ElasticSearch at all.
 
 # Acknowledgements
 
