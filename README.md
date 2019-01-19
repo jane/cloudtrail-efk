@@ -43,7 +43,7 @@ Create an AWS IAM role.
 
 ### Create the Lambda Function
 
-These are instructions for doing it by hand in the console. There's also a[(cloudtrail2ES.yaml](cloudtrail2ES.yaml) file that contains some CloudFormation.
+These are instructions for doing it by hand in the console. There's also a [cloudtrail2ES.yaml](cloudtrail2ES.yaml) file that contains some CloudFormation.
 
 1. Create a new Lambda Function
 2. Choose **Python 3.6** as a runtime.
