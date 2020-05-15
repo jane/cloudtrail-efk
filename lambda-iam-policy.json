@@ -1,27 +1,27 @@
 {
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "AllowCloudWatchLogs",
-            "Effect": "Allow",
-            "Action": [
-                "logs:CreateLogGroup",
-                "logs:CreateLogStream",
-                "logs:PutLogEvents"
-            ],
-            "Resource": "arn:aws:logs:*:*:*"
-        },
-        {
-            "Sid": "AllowS3Access",
-            "Effect": "Allow",
-            "Action": [
-                "s3:Get*",
-                "s3:List*"
-            ],
-            "Resource": [
-                "arn:aws:s3:::MYCLOUDTRAILBUCKET",
-                "arn:aws:s3:::MYCLOUDTRAILBUCKET/*"
-            ]
-        }
-    ]
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowCloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*"
+    },
+    {
+      "Sid": "AllowS3Access",
+      "Effect": "Allow",
+      "Action": [
+        "s3:Get*",
+        "s3:List*"
+      ],
+      "Resource": [
+        "arn:aws:s3:::MYCLOUDTRAILBUCKET",
+        "arn:aws:s3:::MYCLOUDTRAILBUCKET/*"
+      ]
+    }
+  ]
 }
