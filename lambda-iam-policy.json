@@ -2,7 +2,7 @@
     "Version": "2012-10-17",
     "Statement": [
         {
-            "Sid": "AllowClodWatchLogs",
+            "Sid": "AllowCloudWatchLogs",
             "Effect": "Allow",
             "Action": [
                 "logs:CreateLogGroup",
@@ -10,18 +10,6 @@
                 "logs:PutLogEvents"
             ],
             "Resource": "arn:aws:logs:*:*:*"
-        },
-        {
-            "Sid": "AllowESPut",
-            "Effect": "Allow",
-            "Action": [
-                "es:ESHttpHead",
-                "es:ESHttpPost",
-                "es:ESHttpGet",
-                "es:ESHttpDelete",
-                "es:ESHttpPut"
-            ],
-            "Resource": "arn:aws:es:*:*:domain/MYESDOMAIN"
         },
         {
             "Sid": "AllowS3Access",

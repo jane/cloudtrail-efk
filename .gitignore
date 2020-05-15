@@ -1,0 +1,7 @@
+requests*
+urllib*
+idna*
+chardet*
+certifi*
+bin/
+*.zip
